@@ -1,0 +1,19 @@
+
+# Python virtual environment
+.venv/
+venv/
+
+# Private API keys and secrets
+.streamlit/secrets.toml
+.env
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Editor and operating system files
+.vscode/
+.DS_Store
+# Backup and old versions
+app_backup.py
+app_old.py
