@@ -1,0 +1,7 @@
+﻿Employee_ID,Name,Email,Department,Salary
+101,Asha,asha@example.com,IT,45000.0
+102,Ravi,ravi.example.com,Finance,50000.0
+103,Meena,meena@example.com,HR,
+104,Asha,asha@example.com,IT,45000.0
+105,Kiran,kiran@example.com,IT,55000.0
+106,Arun,,Finance,40000.0

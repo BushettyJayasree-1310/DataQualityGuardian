@@ -8,6 +8,7 @@ import streamlit as st
 import numpy as np
 from sklearn.ensemble import IsolationForest
 from google import genai
+from google.genai import types
 
 # -------------------- PAGE CONFIGURATION --------------------
 st.set_page_config(
@@ -176,11 +177,22 @@ if original_df.columns.duplicated().any():
     st.stop()
 
 # Use a fresh, consistent row index for reporting.
+# Use a fresh, consistent row index for reporting.
 original_df = original_df.reset_index(drop=True)
+
+# Clean column names.
 original_df.columns = [
     str(col).strip() if str(col).strip() else f"Unnamed_{i + 1}"
     for i, col in enumerate(original_df.columns)
 ]
+
+# Check for duplicate column names after cleaning.
+if original_df.columns.duplicated().any():
+    st.error(
+        "Some column names are repeated after removing extra spaces. "
+        "Please rename the duplicate columns in your file and upload it again."
+    )
+    st.stop()
 
 # -------------------- ANALYZE ORIGINAL DATA --------------------
 issue_report = analyze_data(original_df)
@@ -399,28 +411,77 @@ st.warning(
 
 
 def ask_gemini(prompt):
-    """Send a bounded prompt to Gemini without exposing the API key in the UI."""
+    """Send a bounded prompt to Gemini with automatic retry handling."""
+
     api_key = st.secrets.get("GEMINI_API_KEY", "")
+
     if not api_key or api_key == "PASTE_NEW_PRIVATE_KEY_HERE":
         return None, (
             "Gemini API key is not configured. Add your private key to "
             ".streamlit/secrets.toml as GEMINI_API_KEY."
         )
+
     try:
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=prompt,
+        retry_options = types.HttpRetryOptions(
+            attempts=2,
+            initial_delay=1,
+            max_delay=5,
+            exp_base=2,
+            jitter=1,
+            http_status_codes=[408, 429, 500, 502, 503, 504],
         )
-        answer = getattr(response, "text", None)
-        if not answer:
-            return None, "Gemini returned an empty response. Please try again."
-        return answer, None
-    
+
+        client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(
+                retry_options=retry_options,
+                timeout=30000,
+            ),
+        )
+
+        models_to_try = [
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-3.1-flash-lite",
+            "gemini-3.8-flash",
+            "gemini-flash-latest"
+        ]
+        last_error = None
+        for model_name in models_to_try:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                answer = getattr(response, "text", None)
+                if answer:
+                    return answer, None
+            except Exception as e:
+                last_error = e
+
+        return None, f"Could not generate AI response. Details: {last_error}"
+
     except Exception as exc:
-        print(f"Gemini error: {type(exc).__name__}: {exc}")
+        error_text = str(exc)
+
+        print(f"Gemini error: {type(exc).__name__}: {error_text}")
+
+        if "503" in error_text or "UNAVAILABLE" in error_text:
+            return None, (
+                "Gemini is temporarily unavailable. "
+                "The app automatically retried the request, "
+                "but the service is still busy. Please try again in a moment."
+            )
+
+        if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
+            return None, (
+                "Gemini request limit was reached temporarily. "
+                "Please wait a little and try again."
+            )
+
         return None, (
-            f"Gemini error: {type(exc).__name__}: {exc}"
+            "The Gemini request could not be completed. "
+            "Please try again."
         )
 
 quality_context = {
