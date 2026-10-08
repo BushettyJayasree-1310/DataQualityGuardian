@@ -8,7 +8,7 @@ The application is designed for data analysts, business teams, students, and res
 
 ## 🚀 Live Demo
 
-**Try the application:** https://dataqualityguardian-yegdgtdztvge6mk56p3wts.streamlit.app/
+**Try the application:** //https://dataqualityguardian-yegdgtdztvge6mk56p3wts.streamlit.app//
 
 ## 🎯 Problem Statement
 
